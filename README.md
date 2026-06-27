@@ -1,4 +1,4 @@
-# 👻 Phantom Protocol
+# Phantom Protocol
 > Predict environmental anomalies before they happen — using only a smartphone.
 
 ![Built with JS](https://img.shields.io/badge/Built_with-JS-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
