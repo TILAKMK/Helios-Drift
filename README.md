@@ -3,7 +3,7 @@
 
 ![Built with JS](https://img.shields.io/badge/Built_with-JS-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
 ![Research Project](https://img.shields.io/badge/Status-Research_Project-0052CC?style=for-the-badge)
-![Patent Pending](https://img.shields.io/badge/Patent-Pending-FF0000?style=for-the-badge)
+
 ![NIE Mysuru](https://img.shields.io/badge/Institution-NIE_Mysuru-10B981?style=for-the-badge)
 
 ## 🔍 What it does
