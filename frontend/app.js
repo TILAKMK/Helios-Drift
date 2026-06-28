@@ -634,6 +634,49 @@ function updateUI() {
   const avgDriftVal = (totalDriftStreak / 4 / 20).toFixed(2);
   document.getElementById('avg-drift-comp').innerText = `${avgDriftVal}σ`;
   document.getElementById('spatial-coeff').innerText = `${selectedNode.spatialFactor.toFixed(2)}x`;
+
+  // Update LSTM Predictor UI (Simulation mode mock)
+  if (!CONFIG.USE_REAL_BACKEND) {
+    const riskVal = Math.min(1.0, selectedNode.compositeHazard / 3.0);
+    let mockProb = riskVal;
+    if (mockProb > 0.05) {
+      mockProb = Math.min(0.99, mockProb * 1.1 + Math.sin(tickCounter / 5) * 0.02);
+    }
+    const probText = (mockProb * 100).toFixed(1) + '%';
+    document.getElementById('lstm-prob-text').innerText = probText;
+    document.getElementById('lstm-prob-bar').style.width = probText;
+
+    let mockLevel = 'NONE';
+    const badge = document.getElementById('lstm-alert-level');
+    if (mockProb >= 0.75) {
+      mockLevel = 'CRITICAL';
+      badge.style.background = '#7f1d1d';
+      badge.style.color = '#f87171';
+    } else if (mockProb >= 0.5) {
+      mockLevel = 'WARNING';
+      badge.style.background = '#78350f';
+      badge.style.color = '#fbbf24';
+    } else if (mockProb >= 0.3) {
+      mockLevel = 'WATCH';
+      badge.style.background = '#1e3a8a';
+      badge.style.color = '#60a5fa';
+    } else {
+      mockLevel = 'NONE';
+      badge.style.background = '#374151';
+      badge.style.color = '#9ca3af';
+    }
+    badge.innerText = mockLevel;
+
+    const leadTimeEl = document.getElementById('lstm-lead-time');
+    if (mockProb >= 0.5) {
+      const mockMin = Math.max(1.0, 30.0 * (1.0 - mockProb) + Math.sin(tickCounter / 10) * 2);
+      leadTimeEl.innerText = `~${mockMin.toFixed(1)} min`;
+      leadTimeEl.style.color = mockLevel === 'CRITICAL' ? '#f87171' : '#fbbf24';
+    } else {
+      leadTimeEl.innerText = '-- min';
+      leadTimeEl.style.color = '#38bdf8';
+    }
+  }
 }
 
 function colorizeZScoreEl(id, val) {
@@ -1071,6 +1114,42 @@ function connectLiveBackend() {
         
         updateUI();
         drawCharts();
+        
+        // Parse backend LSTM predictions
+        if (data.lstm) {
+          const prob = data.lstm.p_event;
+          const probText = (prob * 100).toFixed(1) + '%';
+          document.getElementById('lstm-prob-text').innerText = probText;
+          document.getElementById('lstm-prob-bar').style.width = probText;
+
+          const alertLvl = data.lstm.alert_level.toUpperCase();
+          const badge = document.getElementById('lstm-alert-level');
+          badge.innerText = alertLvl;
+
+          if (alertLvl === 'NONE') {
+            badge.style.background = '#374151';
+            badge.style.color = '#9ca3af';
+          } else if (alertLvl === 'WATCH') {
+            badge.style.background = '#1e3a8a';
+            badge.style.color = '#60a5fa';
+          } else if (alertLvl === 'WARNING') {
+            badge.style.background = '#78350f';
+            badge.style.color = '#fbbf24';
+          } else if (alertLvl === 'CRITICAL') {
+            badge.style.background = '#7f1d1d';
+            badge.style.color = '#f87171';
+          }
+
+          const minToEvent = data.lstm.minutes_to_event;
+          const leadTimeEl = document.getElementById('lstm-lead-time');
+          if (prob >= 0.5) {
+            leadTimeEl.innerText = `~${minToEvent.toFixed(1)} min`;
+            leadTimeEl.style.color = alertLvl === 'CRITICAL' ? '#f87171' : '#fbbf24';
+          } else {
+            leadTimeEl.innerText = '-- min';
+            leadTimeEl.style.color = '#38bdf8';
+          }
+        }
         
         const forecastEl = document.getElementById('trend-forecast');
         if (forecastEl) {

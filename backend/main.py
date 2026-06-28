@@ -32,6 +32,9 @@ logger.addHandler(handler)
 # Suppress debug logs from libraries unless needed
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
+import os
+from backend.core.lstm_predictor import LSTMPredictor
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Ping database to verify connection pool
@@ -41,6 +44,21 @@ async def lifespan(app: FastAPI):
         logger.info("Lifespan database connectivity verified.")
     else:
         logger.error("Lifespan database connectivity check failed!")
+        
+    # Load LSTM Predictor if best_model.pt and scaler.pkl exist
+    model_path = "backend/ml/checkpoints/best_model.pt"
+    scaler_path = "backend/ml/checkpoints/scaler.pkl"
+    if os.path.exists(model_path) and os.path.exists(scaler_path):
+        try:
+            app.state.lstm_predictor = LSTMPredictor(model_path, scaler_path)
+            logger.info("Trained PhantomLSTM inference engine loaded successfully.")
+        except Exception as e:
+            logger.error(f"Failed to load trained LSTM model: {e}")
+            app.state.lstm_predictor = None
+    else:
+        logger.warning("LSTM model not trained yet, drift score only mode.")
+        app.state.lstm_predictor = None
+
     yield
     # Shutdown: Dispose engine pool
     await engine.dispose()

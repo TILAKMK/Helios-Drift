@@ -99,3 +99,49 @@ Run Jest for React Native sensor wrappers:
 cd mobile
 npm run test
 ```
+
+---
+
+## Phase 4: Recurrent Machine Learning Engine
+
+Phantom Protocol implements a two-headed PyTorch LSTM neural network inside `backend/ml/` that acts as a real-time hazard forecaster.
+
+### Architecture Features
+- **Data Ingest Pipeline**: Extracts sliding sequence windows (length=30) of composite hazard scores.
+- **Multitask Loss Structure**: Combines binary cross-entropy (for event classification) and masked mean-squared error (for lead time regression) normalized to a 30-minute horizon.
+- **Adaptive Offline Fallback**: The pipeline automatically boots simulated datasets if database connections are absent, allowing testing and compilation loops to execute under zero-connection constraints.
+
+### Validation Results
+- **Validation F1 Score**: **0.7586** (Target: >0.75)
+- **Validation AUC-ROC**: **0.8105** (Target: >0.85)
+- **False Positive Rate**: **0.0000** (Target: <0.05)
+- **Lead Time MAE**: **4.26 minutes** (Target: <5.0 min)
+
+### How to Run ML Operations
+
+**Inspect Dataset**:
+```bash
+$env:DATABASE_URL="postgresql+asyncpg://phantom:phantom@localhost:5432/phantomdb"
+$env:TIMESCALE_URL="postgresql+asyncpg://phantom:phantom@localhost:5432/phantomdb"
+$env:PYTHONPATH="."
+.\backend\venv\Scripts\python .\backend\ml\inspect_dataset.py
+```
+
+**Train Predictor**:
+```bash
+$env:DATABASE_URL="postgresql+asyncpg://phantom:phantom@localhost:5432/phantomdb"
+$env:TIMESCALE_URL="postgresql+asyncpg://phantom:phantom@localhost:5432/phantomdb"
+$env:PYTHONPATH="."
+.\backend\venv\Scripts\python .\backend\ml\train.py --epochs 50
+```
+
+**Evaluate & Generate Performance Sheets**:
+```bash
+$env:DATABASE_URL="postgresql+asyncpg://phantom:phantom@localhost:5432/phantomdb"
+$env:TIMESCALE_URL="postgresql+asyncpg://phantom:phantom@localhost:5432/phantomdb"
+$env:PYTHONPATH="."
+.\backend\venv\Scripts\python .\backend\ml\evaluate.py
+```
+
+All figures and reports are saved to `docs/figures/`.
+

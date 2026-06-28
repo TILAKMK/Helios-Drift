@@ -14,6 +14,7 @@ class DriftResult:
     cross_channel_event: bool
     alert_triggered: bool
     lead_time_estimate_min: float | None
+    lstm: Any = None
 
 class DriftDetector:
     """

@@ -202,6 +202,18 @@ async def ws_sensor_stream(websocket: WebSocket, env_id: str, device_id: str = Q
                 }])
                 await session.commit()
 
+            # Run LSTM prediction if predictor exists
+            lstm_pred_data = None
+            if hasattr(websocket.app.state, "lstm_predictor") and websocket.app.state.lstm_predictor:
+                scores = list(detector.history_scores)
+                prediction = websocket.app.state.lstm_predictor.predict(scores)
+                drift_res.lstm = prediction
+                lstm_pred_data = {
+                    "p_event": prediction.p_event,
+                    "minutes_to_event": prediction.minutes_to_event,
+                    "alert_level": prediction.alert_level
+                }
+
             # Push live drift update to connected dashboard clients
             dashboard_msg = {
                 "type": "drift_update",
@@ -211,6 +223,7 @@ async def ws_sensor_stream(websocket: WebSocket, env_id: str, device_id: str = Q
                 "cross_channel_event": drift_res.cross_channel_event,
                 "alert_triggered": (detector.state == "ALERT"),
                 "lead_time_estimate_min": drift_res.lead_time_estimate_min,
+                "lstm": lstm_pred_data,
                 "timestamp": drift_res.timestamp.isoformat()
             }
             await manager.broadcast(env_id, dashboard_msg)
@@ -221,7 +234,8 @@ async def ws_sensor_stream(websocket: WebSocket, env_id: str, device_id: str = Q
                 "composite_score": drift_res.composite_score,
                 "channels_above": drift_res.channels_above,
                 "lead_time_estimate_min": drift_res.lead_time_estimate_min,
-                "alert_triggered": (detector.state == "ALERT")
+                "alert_triggered": (detector.state == "ALERT"),
+                "lstm": lstm_pred_data
             })
             
     except WebSocketDisconnect:

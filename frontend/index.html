@@ -396,6 +396,27 @@
               <p class="banner-desc" id="alarm-banner-desc">All indicators are within statistical baseline variance. No anomaly registered.</p>
             </div>
 
+            <!-- LSTM Pre-Event Predictor Card -->
+            <div class="lstm-predictor-card" id="lstm-card" style="margin-top: 12px; background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 6px; padding: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 10px; font-weight: bold; color: #a78bfa; letter-spacing: 1px;">LSTM PRE-EVENT PREDICTOR</span>
+                <span id="lstm-alert-level" style="font-size: 9px; font-weight: 900; padding: 2px 6px; border-radius: 3px; background: #374151; color: #9ca3af; font-family: monospace;">NONE</span>
+              </div>
+              <div style="margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-bottom: 4px; font-family: monospace;">
+                  <span>Probability of Event (30m)</span>
+                  <span class="monospace bold" id="lstm-prob-text">0.0%</span>
+                </div>
+                <div style="height: 6px; background: #1e293b; border-radius: 3px; overflow: hidden;">
+                  <div id="lstm-prob-bar" style="height: 100%; width: 0%; background: #a78bfa; transition: width 0.3s ease;"></div>
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 11px; color: #64748b; font-family: monospace;">Estimated Lead Time</span>
+                <span class="monospace bold" id="lstm-lead-time" style="font-size: 14px; color: #38bdf8;">-- min</span>
+              </div>
+            </div>
+
           </div>
         </div>
 
