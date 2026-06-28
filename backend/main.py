@@ -87,6 +87,12 @@ app.include_router(drift.router)
 app.include_router(alerts.router)
 app.include_router(labels.router)
 
+from fastapi.responses import RedirectResponse
+
+@app.get("/")
+async def root_redirect():
+    return RedirectResponse(url="/docs")
+
 @app.get("/health")
 async def health_check():
     db_ok = await ping_db()
