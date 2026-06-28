@@ -25,15 +25,27 @@
     "uuid": "^14.0.1"
   },
   "devDependencies": {
+    "@react-native/jest-preset": "^0.86.0",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
     "@types/uuid": "^10.0.0",
+    "jest": "^30.4.2",
+    "jest-expo": "^56.0.5",
+    "ts-jest": "^29.4.11",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "jest"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"
+    ]
   },
   "private": true
 }
