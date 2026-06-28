@@ -35,8 +35,17 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('time', 'device_id')
     )
     
-    # Create TimescaleDB hypertable for sensor_readings
-    op.execute("SELECT create_hypertable('sensor_readings', 'time');")
+    # Check if timescaledb extension is available
+    bind = op.get_bind()
+    has_timescale = bind.execute(sa.text(
+        "SELECT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'create_hypertable');"
+    )).scalar()
+
+    # Create TimescaleDB hypertable for sensor_readings if timescale is available
+    if has_timescale:
+        op.execute("SELECT create_hypertable('sensor_readings', 'time');")
+    else:
+        print("TimescaleDB extension not found. Skipping hypertable creation for 'sensor_readings'.")
     
     # 2. Create baselines
     op.create_table(
@@ -77,8 +86,11 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('time', 'device_id')
     )
     
-    # Create TimescaleDB hypertable for drift_scores
-    op.execute("SELECT create_hypertable('drift_scores', 'time');")
+    # Create TimescaleDB hypertable for drift_scores if timescale is available
+    if has_timescale:
+        op.execute("SELECT create_hypertable('drift_scores', 'time');")
+    else:
+        print("TimescaleDB extension not found. Skipping hypertable creation for 'drift_scores'.")
     
     # 4. Create alert_events
     op.create_table(
