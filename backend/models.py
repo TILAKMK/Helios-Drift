@@ -72,3 +72,17 @@ class AlertEvent(Base):
     channels_involved = Column(ARRAY(String))
     resolved_at = Column(DateTime(timezone=True))
     ground_truth = Column(Boolean, default=None, nullable=True)
+
+class GroundTruthLabel(Base):
+    __tablename__ = 'ground_truth_labels'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    env_id = Column(String, nullable=False)
+    device_id = Column(UUID(as_uuid=True), nullable=False)
+    session_id = Column(UUID(as_uuid=True), nullable=False)
+    event_type = Column(String, nullable=False)
+    severity = Column(Integer, nullable=False)
+    notes = Column(String, nullable=True)
+    labeled_at = Column(DateTime(timezone=True), nullable=False)
+    score_at_time = Column(Float, nullable=True)
+    lead_time_actual_min = Column(Float, nullable=True)

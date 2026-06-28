@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.database import engine, ping_db
-from backend.routers import sensors, baseline, drift, alerts
+from backend.routers import sensors, baseline, drift, alerts, labels
 
 # Structured JSON Logging Setup
 class JSONFormatter(logging.Formatter):
@@ -67,6 +67,7 @@ app.include_router(sensors.router)
 app.include_router(baseline.router)
 app.include_router(drift.router)
 app.include_router(alerts.router)
+app.include_router(labels.router)
 
 @app.get("/health")
 async def health_check():

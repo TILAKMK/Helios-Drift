@@ -215,6 +215,15 @@ async def ws_sensor_stream(websocket: WebSocket, env_id: str, device_id: str = Q
             }
             await manager.broadcast(env_id, dashboard_msg)
             
+            # Send drift result calculation directly back to the streaming client
+            await websocket.send_json({
+                "type": "drift_result",
+                "composite_score": drift_res.composite_score,
+                "channels_above": drift_res.channels_above,
+                "lead_time_estimate_min": drift_res.lead_time_estimate_min,
+                "alert_triggered": (detector.state == "ALERT")
+            })
+            
     except WebSocketDisconnect:
         end_time = datetime.datetime.now(datetime.timezone.utc)
         duration = (end_time - start_time).total_seconds()
