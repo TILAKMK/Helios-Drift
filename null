@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phantom Protocol — Early Warning Multi-Modal Weak-Signal Fusion Dashboard</title>
+  <!-- Google Fonts: Outfit for sleek modern UI, JetBrains Mono for telemetry/logs -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <div class="logo-icon"></div>
+        <div class="logo-text">
+          <h1>PHANTOM PROTOCOL</h1>
+          <span class="subtitle">B2G SAFETY INFRASTRUCTURE • WEAK-SIGNAL FUSION DEVIATION</span>
+        </div>
+      </div>
+      
+      <div class="system-status-indicator">
+        <div class="status-dot green" id="system-status-dot"></div>
+        <div class="status-text-container">
+          <span class="status-label">SYSTEM STATE</span>
+          <span class="status-value green-text" id="system-status-text">NOMINAL / MONITORING</span>
+        </div>
+      </div>
+
+      <!-- Mode Toggle Button -->
+      <div class="system-status-indicator" style="gap: 8px;">
+        <button class="btn btn-secondary" id="btn-mode-toggle" style="padding: 4px 10px; font-size: 0.7rem; min-height: 0; margin-top: 0; border-color: var(--neon-cyan); color: var(--neon-cyan); text-shadow: 0 0 4px var(--neon-cyan-dim); cursor: pointer;">SIMULATION MODE</button>
+        <span class="badge" id="live-badge" style="display: none; background: rgba(57, 255, 20, 0.1); border: 1px solid var(--neon-green); color: var(--neon-green); font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-shadow: 0 0 4px var(--neon-green-dim); letter-spacing: 0.5px;">LIVE</span>
+      </div>
+
+      <div class="header-metadata">
+        <div class="meta-item">
+          <span class="meta-label">TREND FORECAST</span>
+          <span class="meta-val text-green" id="trend-forecast">Stable</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">SECTOR</span>
+          <span class="meta-val">METRO-7 (CENTRAL)</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">ACTIVE NODES</span>
+          <span class="meta-val">4 / 4 ONLINE</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">TIME</span>
+          <span class="meta-val monospace" id="header-clock">16:19:11 UTC</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <main class="dashboard-grid">
+      
+      <!-- Left Column: Simulation & Parameters Panel -->
+      <section class="panel-card sidebar-left">
+        <div class="panel-header">
+          <span class="panel-title-icon">⚡</span>
+          <h2>SIMULATION CONTROL COCKPIT</h2>
+        </div>
+        <div class="panel-body">
+          <!-- Simulation Presets -->
+          <div class="section-group">
+            <h3>SCENARIO PRESETS</h3>
+            <div class="preset-buttons">
+              <button class="btn btn-preset active" id="btn-scenario-normal" data-scenario="normal">
+                <span class="btn-dot green"></span>
+                <span class="btn-lbl">1. Normal Ambient Noise</span>
+              </button>
+              <button class="btn btn-preset" id="btn-scenario-drift" data-scenario="drift">
+                <span class="btn-dot purple"></span>
+                <span class="btn-lbl">2. Single Sensor Drift</span>
+              </button>
+              <button class="btn btn-preset" id="btn-scenario-panic" data-scenario="panic">
+                <span class="btn-dot orange"></span>
+                <span class="btn-lbl">3. Crowd Anomaly / Panic</span>
+              </button>
+              <button class="btn btn-preset" id="btn-scenario-disaster" data-scenario="disaster">
+                <span class="btn-dot red"></span>
+                <span class="btn-lbl">4. Composite Hazard (Weak Signals)</span>
+              </button>
+            </div>
+            <p class="preset-description" id="scenario-description">
+              System is running in normal state. Micro-behaviors, noise levels, and sensor drift are within normal diurnal fluctuations.
+            </p>
+          </div>
+
+          <!-- Live Physical Ingest -->
+          <div class="section-group">
+            <h3>LIVE SENSOR INGEST</h3>
+            <div class="toggle-control-item">
+              <div class="toggle-info">
+                <span class="toggle-title">Browser Microphone Ingest</span>
+                <span class="toggle-desc">Map room decibels to Subway Node (A)</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="mic-toggle">
+                <span class="slider round"></span>
+              </label>
+            </div>
+            <div class="mic-level-container hidden" id="mic-meter-wrapper">
+              <span class="meter-lbl monospace">dB SPL: <span id="mic-db-val">0.0</span></span>
+              <div class="level-bar-bg">
+                <div class="level-bar-fill" id="mic-db-fill" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fusion Algorithm Configuration -->
+          <div class="section-group">
+            <h3>FUSION ALGORITHM WEIGHTS</h3>
+            
+            <div class="range-control-item">
+              <div class="range-labels">
+                <span>Ambient Noise (w_noise)</span>
+                <span class="range-value monospace" id="val-w-noise">0.35</span>
+              </div>
+              <input type="range" id="slider-w-noise" min="0" max="1" step="0.05" value="0.35">
+            </div>
+
+            <div class="range-control-item">
+              <div class="range-labels">
+                <span>WiFi Crowd Micro-behavior (w_wifi)</span>
+                <span class="range-value monospace" id="val-w-wifi">0.35</span>
+              </div>
+              <input type="range" id="slider-w-wifi" min="0" max="1" step="0.05" value="0.35">
+            </div>
+
+            <div class="range-control-item">
+              <div class="range-labels">
+                <span>Sensor Drift baseline (w_drift)</span>
+                <span class="range-value monospace" id="val-w-drift">0.30</span>
+              </div>
+              <input type="range" id="slider-w-drift" min="0" max="1" step="0.05" value="0.30">
+            </div>
+
+            <div class="range-control-item">
+              <div class="range-labels">
+                <span>Baseline Adaptation Speed (&alpha;)</span>
+                <span class="range-value monospace" id="val-alpha">0.020</span>
+              </div>
+              <input type="range" id="slider-alpha" min="0.005" max="0.100" step="0.005" value="0.020">
+            </div>
+
+            <div class="range-control-item">
+              <div class="range-labels">
+                <span>Composite Alarm Threshold (&theta;)</span>
+                <span class="range-value monospace" id="val-theta">1.80</span>
+              </div>
+              <input type="range" id="slider-theta" min="0.5" max="3.5" step="0.05" value="1.80">
+            </div>
+            
+            <button class="btn btn-secondary" id="btn-reset-baseline">Reset Learned Baselines</button>
+            <button class="btn btn-preset" id="btn-export-session" style="margin-top: 8px; justify-content: center; border-color: var(--neon-purple-dim); color: var(--neon-purple); text-shadow: 0 0 4px var(--neon-purple-dim);"><span class="btn-dot purple"></span>💾 Export Session JSON</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Center Column: Node Map & Status Grid -->
+      <section class="center-content">
+        <!-- The SVG District Node Map -->
+        <div class="panel-card map-card">
+          <div class="panel-header">
+            <span class="panel-title-icon">🗺️</span>
+            <h2>DISTRICT TELEMETRY MAP</h2>
+          </div>
+          <div class="panel-body map-container-body">
+            <div class="svg-map-wrapper">
+              <!-- Visualized City Grid -->
+              <svg viewBox="0 0 800 420" class="district-svg" id="district-svg">
+                <!-- Grid Lines -->
+                <defs>
+                  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0, 240, 255, 0.04)" stroke-width="1" />
+                  </pattern>
+                  <!-- Cyber Glow Filters -->
+                  <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="6" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                  <filter id="glow-amber" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="6" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                  <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="8" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                  <filter id="glow-purple" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="6" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+
+                <!-- Streets & Layout (Decorative grid lines resembling city blocks) -->
+                <path d="M 80,0 L 80,420 M 240,0 L 240,420 M 400,0 L 400,420 M 560,0 L 560,420 M 720,0 L 720,420" stroke="rgba(255,255,255,0.02)" stroke-width="2" />
+                <path d="M 0,80 L 800,80 M 0,220 L 800,220 M 0,360 L 800,360" stroke="rgba(255,255,255,0.02)" stroke-width="2" />
+
+                <!-- Transit Route Paths (Simulated pathways) -->
+                <path d="M 120,420 Q 180,180 500,120 T 780,240" fill="none" stroke="rgba(0, 240, 255, 0.08)" stroke-width="4" stroke-dasharray="10, 5" />
+                <path d="M 20,180 Q 300,350 780,350" fill="none" stroke="rgba(0, 240, 255, 0.05)" stroke-width="6" />
+
+                <!-- Connection Lines showing Spatially Correlated Nodes -->
+                <line x1="180" y1="120" x2="350" y2="280" class="spatial-link" id="link-ab" />
+                <line x1="350" y1="280" x2="620" y2="150" class="spatial-link" id="link-bc" />
+                <line x1="620" y1="150" x2="520" y2="330" class="spatial-link" id="link-cd" />
+                <line x1="520" y1="330" x2="180" y2="120" class="spatial-link" id="link-da" />
+
+                <!-- Node A: Subway Station (Top Left) -->
+                <g class="map-node active" id="map-node-a" transform="translate(180, 120)">
+                  <circle r="26" class="node-glow-ring cyan" />
+                  <circle r="14" class="node-core cyan" />
+                  <text y="45" class="node-label">Subway Platform (A)</text>
+                  <text y="-35" class="node-mini-status text-cyan" id="node-a-status">NOMINAL</text>
+                </g>
+
+                <!-- Node B: Central Market Square (Bottom Center-Left) -->
+                <g class="map-node" id="map-node-b" transform="translate(350, 280)">
+                  <circle r="26" class="node-glow-ring cyan" />
+                  <circle r="14" class="node-core cyan" />
+                  <text y="45" class="node-label">Market Square (B)</text>
+                  <text y="-35" class="node-mini-status text-cyan" id="node-b-status">NOMINAL</text>
+                </g>
+
+                <!-- Node C: High Street Narrow Alley (Top Right) -->
+                <g class="map-node" id="map-node-c" transform="translate(620, 150)">
+                  <circle r="26" class="node-glow-ring cyan" />
+                  <circle r="14" class="node-core cyan" />
+                  <text y="45" class="node-label">Narrow Alley (C)</text>
+                  <text y="-35" class="node-mini-status text-cyan" id="node-c-status">NOMINAL</text>
+                </g>
+
+                <!-- Node D: Industrial Warehouse (Bottom Right) -->
+                <g class="map-node" id="map-node-d" transform="translate(520, 330)">
+                  <circle r="26" class="node-glow-ring cyan" />
+                  <circle r="14" class="node-core cyan" />
+                  <text y="45" class="node-label">Warehouse (D)</text>
+                  <text y="-35" class="node-mini-status text-cyan" id="node-d-status">NOMINAL</text>
+                </g>
+              </svg>
+            </div>
+            
+            <!-- Dynamic Map Stats Overlay -->
+            <div class="map-overlay-stats">
+              <div class="stat-bubble">
+                <span class="bubble-label">AVG DRIFT COMP</span>
+                <span class="bubble-val monospace" id="avg-drift-comp">0.03σ</span>
+              </div>
+              <div class="stat-bubble">
+                <span class="bubble-label">SPATIAL R-COEFF</span>
+                <span class="bubble-val monospace" id="spatial-coeff">1.00x</span>
+              </div>
+              <div class="stat-bubble">
+                <span class="bubble-label">ALGORITHM MODE</span>
+                <span class="bubble-val text-cyan">ONLINE-EMA</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Node Telemetry / Raw Sensor View -->
+        <div class="panel-card details-card">
+          <div class="panel-header tab-header">
+            <div class="tab-title">
+              <span class="panel-title-icon">📊</span>
+              <h2>TELEMETRY DEVIATION: <span class="active-node-name" id="selected-node-title">SUBWAY PLATFORM (NODE A)</span></h2>
+            </div>
+            <div class="node-selector-tabs">
+              <button class="tab-btn active" data-node="a">NODE A</button>
+              <button class="tab-btn" data-node="b">NODE B</button>
+              <button class="tab-btn" data-node="c">NODE C</button>
+              <button class="tab-btn" data-node="d">NODE D</button>
+            </div>
+          </div>
+          <div class="panel-body telemetry-dashboard">
+            <!-- 3 Columns for the 3 weak signals -->
+            <div class="signals-columns-grid">
+              
+              <!-- Signal 1: Ambient Noise Floor -->
+              <div class="signal-sensor-card">
+                <div class="sensor-card-header">
+                  <div class="sensor-meta">
+                    <span class="sensor-title">Ambient Noise Floor</span>
+                    <span class="sensor-desc">Acoustic power bands (10Hz-22kHz)</span>
+                  </div>
+                  <span class="sensor-live-val monospace" id="raw-noise-val">45.2 dB</span>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chart-noise"></canvas>
+                </div>
+                <div class="z-score-indicator-bar">
+                  <span>Deviation (z-score)</span>
+                  <span class="monospace bold" id="z-noise-val">+0.12&sigma;</span>
+                </div>
+              </div>
+
+              <!-- Signal 2: WiFi RSSI Micro-Behavior -->
+              <div class="signal-sensor-card">
+                <div class="sensor-card-header">
+                  <div class="sensor-meta">
+                    <span class="sensor-title">WiFi Multi-Path Variance</span>
+                    <span class="sensor-desc">Proxy for crowd micro-movements</span>
+                  </div>
+                  <span class="sensor-live-val monospace" id="raw-wifi-val">1.2% var</span>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chart-wifi"></canvas>
+                </div>
+                <div class="z-score-indicator-bar">
+                  <span>Deviation (z-score)</span>
+                  <span class="monospace bold" id="z-wifi-val">+0.04&sigma;</span>
+                </div>
+              </div>
+
+              <!-- Signal 3: Micro-Acceleration (accel) drift -->
+              <div class="signal-sensor-card">
+                <div class="sensor-card-header">
+                  <div class="sensor-meta">
+                    <span class="sensor-title" id="sensor-drift-title">Micro-Acceleration (accel)</span>
+                    <span class="sensor-desc" id="sensor-drift-desc">Raw micro-accel vs calibrated baseline</span>
+                  </div>
+                  <span class="sensor-live-val monospace" id="raw-drift-val">242 mG</span>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chart-drift"></canvas>
+                </div>
+                <div class="z-score-indicator-bar">
+                  <span>Deviation (z-score)</span>
+                  <span class="monospace bold" id="z-drift-val">+0.01&sigma;</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Composite Risk Engine & Logs -->
+      <section class="panel-card sidebar-right">
+        <!-- Fusion Risk Gauge -->
+        <div class="fusion-gauge-section">
+          <div class="panel-header">
+            <span class="panel-title-icon">⚙️</span>
+            <h2>FUSION COMPOSITE ENGINE</h2>
+          </div>
+          <div class="panel-body composite-dial-body">
+            
+            <div class="gauge-meter-wrapper">
+              <svg viewBox="0 0 200 200" class="gauge-svg">
+                <!-- Circular gauge path -->
+                <circle cx="100" cy="100" r="75" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="12" />
+                <circle cx="100" cy="100" r="75" fill="none" stroke="url(#gauge-gradient)" stroke-dasharray="471" stroke-dashoffset="471" stroke-width="12" class="gauge-progress-bar" id="gauge-progress" />
+                
+                <defs>
+                  <linearGradient id="gauge-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#00f0ff" />
+                    <stop offset="50%" stop-color="#ffaa00" />
+                    <stop offset="100%" stop-color="#ff0055" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              
+              <div class="gauge-text-overlay">
+                <span class="gauge-number-lbl" id="composite-score-text">0.15</span>
+                <span class="gauge-unit">COMPOSITE HAZARD</span>
+                <span class="gauge-state-lbl green-text" id="composite-state-text">SAFE</span>
+              </div>
+            </div>
+
+            <div class="metric-readout-rows">
+              <div class="readout-row">
+                <span>Weighted Sum ($H_{raw}$)</span>
+                <span class="monospace" id="raw-weighted-score">0.15</span>
+              </div>
+              <div class="readout-row">
+                <span>Spatial Correlation Factor</span>
+                <span class="monospace" id="spatial-factor">1.00x</span>
+              </div>
+              <div class="readout-row border-top">
+                <span>Hazard Score ($H$)</span>
+                <span class="monospace bold text-cyan" id="final-hazard-score">0.15</span>
+              </div>
+            </div>
+
+            <!-- Risk Status Banner -->
+            <div class="status-alert-banner status-green" id="alarm-banner">
+              <span class="banner-title" id="alarm-banner-title">MONITORING WEAK CHANNELS</span>
+              <p class="banner-desc" id="alarm-banner-desc">All indicators are within statistical baseline variance. No anomaly registered.</p>
+            </div>
+
+            <!-- LSTM Pre-Event Predictor Card -->
+            <div class="lstm-predictor-card" id="lstm-card" style="margin-top: 12px; background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 6px; padding: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 10px; font-weight: bold; color: #a78bfa; letter-spacing: 1px;">LSTM PRE-EVENT PREDICTOR</span>
+                <span id="lstm-alert-level" style="font-size: 9px; font-weight: 900; padding: 2px 6px; border-radius: 3px; background: #374151; color: #9ca3af; font-family: monospace;">NONE</span>
+              </div>
+              <div style="margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-bottom: 4px; font-family: monospace;">
+                  <span>Probability of Event (30m)</span>
+                  <span class="monospace bold" id="lstm-prob-text">0.0%</span>
+                </div>
+                <div style="height: 6px; background: #1e293b; border-radius: 3px; overflow: hidden;">
+                  <div id="lstm-prob-bar" style="height: 100%; width: 0%; background: #a78bfa; transition: width 0.3s ease;"></div>
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 11px; color: #64748b; font-family: monospace;">Estimated Lead Time</span>
+                <span class="monospace bold" id="lstm-lead-time" style="font-size: 14px; color: #38bdf8;">-- min</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- System Alerts / Logs -->
+        <div class="alerts-log-section">
+          <div class="panel-header">
+            <span class="panel-title-icon">📋</span>
+            <h2>REAL-TIME ANALYSIS LOGS</h2>
+          </div>
+          <div class="panel-body terminal-panel-body">
+            <div class="terminal-logs monospace" id="system-logs">
+              <!-- Logs populated dynamically -->
+              <div class="log-line text-dim">[16:19:11] System initialization started.</div>
+              <div class="log-line text-dim">[16:19:11] Baseline adaptive calibration: Active.</div>
+              <div class="log-line text-cyan">[16:19:11] Phantom Fusion engine successfully loaded.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom Row: 5-Minute Risk History & Risk Alerts -->
+      <section class="bottom-panel" style="grid-column: 1 / span 3; display: grid; grid-template-columns: 2fr 1fr; gap: 12px; margin-top: 4px;">
+        <!-- Risk History Card -->
+        <div class="panel-card risk-history-card">
+          <div class="panel-header">
+            <span class="panel-title-icon">📈</span>
+            <h2>5-MINUTE COMPOSITE RISK SCORE HISTORY</h2>
+          </div>
+          <div class="panel-body" style="padding: 16px; height: 170px; min-height: 170px; overflow: hidden; position: relative;">
+            <div class="chart-container" style="height: 100%; position: relative;">
+              <canvas id="chart-risk-history"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Risk Events Terminal Log -->
+        <div class="panel-card risk-events-card">
+          <div class="panel-header">
+            <span class="panel-title-icon">⚠️</span>
+            <h2>RISK EVENT LOG (CROSSINGS &gt; 0.5)</h2>
+          </div>
+          <div class="panel-body terminal-panel-body" style="padding: 0; height: 170px; min-height: 170px;">
+            <div class="terminal-logs monospace" id="risk-event-logs" style="height: 100%; padding: 14px 18px; overflow-y: auto;">
+              <div class="log-line text-dim">No critical threshold crossings recorded.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

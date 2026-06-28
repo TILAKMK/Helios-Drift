@@ -8,6 +8,7 @@ engine = create_async_engine(
     pool_size=5,
     max_overflow=15,
     pool_timeout=30.0,
+    pool_pre_ping=True,
     echo=False
 )
 
@@ -29,5 +30,7 @@ async def ping_db() -> bool:
         async with AsyncSessionLocal() as session:
             result = await session.execute(text("SELECT 1"))
             return result.scalar() == 1
-    except Exception:
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return False

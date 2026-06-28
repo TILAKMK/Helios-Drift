@@ -39,6 +39,7 @@ from backend.core.lstm_predictor import LSTMPredictor
 async def lifespan(app: FastAPI):
     # Startup: Ping database to verify connection pool
     logger.info("Initializing Phantom Protocol FastAPI application...")
+    logger.info(f"Database URL: {settings.DATABASE_URL}")
     db_ok = await ping_db()
     if db_ok:
         logger.info("Lifespan database connectivity verified.")
