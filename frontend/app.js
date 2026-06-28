@@ -9,6 +9,15 @@ const CONFIG = {
   tickRateMs: 100,
   maxHistorySize: 100,
   spatialCoefficientScale: 0.35, // How much adjacent anomalies amplify local risk
+  
+  // Real Backend configurations
+  BACKEND_WS: "ws://localhost:8000/ws/dashboard",
+  SENSOR_WS:  "ws://localhost:8000/ws/sensor-stream",
+  API_BASE:   "http://localhost:8000/api",
+  ENV_ID:     "classroom-nie-204",
+  DEVICE_ID:  "35182c6e-cd27-445d-b1a6-534190a9570d", // static or random UUID matching standard mock uuid
+  SESSION_ID: "4efef345-0931-49dc-9811-fe7bc7c40b29",
+  USE_REAL_BACKEND: false,
 };
 
 // Fusion parameters (bind to sliders)
@@ -194,6 +203,73 @@ window.addEventListener('resize', () => {
 function runSimulationTick() {
   tickCounter++;
   
+  if (CONFIG.USE_REAL_BACKEND) {
+    Object.values(nodes).forEach(node => {
+      const timeCycle = Math.sin(tickCounter * 0.02) * 2;
+      
+      let rawNoise = randomNormal(node.sensors.noise.base + timeCycle, node.sensors.noise.variance);
+      let rawWifi = Math.max(0.1, randomNormal(node.sensors.wifi.base, node.sensors.wifi.variance));
+      let rawDrift = randomNormal(node.sensors.drift.base + timeCycle * 2, node.sensors.drift.variance);
+
+      if (node.id === 'a' && micStream && analyserNode) {
+        const micGain = Math.max(0, micDbValue + 100);
+        rawNoise = 38 + (micGain * 0.5);
+      }
+
+      if (currentScenario === 'drift') {
+        if (node.id === 'd') {
+          node.sensors.drift.driftOffset += 0.45;
+          rawDrift += node.sensors.drift.driftOffset;
+        }
+      } else if (currentScenario === 'panic') {
+        if (node.id === 'a' || node.id === 'b') {
+          const elapsed = tickCounter - scenarioStartTick;
+          const ramp = Math.min(1.0, elapsed / 150);
+          rawNoise += randomNormal(12 * ramp, 2.5);
+          rawWifi += randomNormal(1.6 * ramp, 0.4);
+        }
+      } else if (currentScenario === 'disaster') {
+        if (node.id === 'a') {
+          const elapsed = tickCounter - scenarioStartTick;
+          const noiseAnomaly = 3.0 + elapsed * 0.1;
+          const wifiAnomaly = 0.2 + elapsed * 0.01;
+          const driftAnomaly = 1.0 + elapsed * 0.3;
+          
+          rawNoise += noiseAnomaly;
+          rawWifi += wifiAnomaly;
+          node.sensors.drift.driftOffset = driftAnomaly;
+          rawDrift += node.sensors.drift.driftOffset;
+        }
+      }
+
+      node.sensors.noise.raw = rawNoise;
+      node.sensors.wifi.raw = rawWifi;
+      node.sensors.drift.raw = rawDrift;
+
+      if (node.id === selectedNodeId && tickCounter % 20 === 0) {
+        if (sensorWs && sensorWs.readyState === WebSocket.OPEN) {
+          sensorWs.send(JSON.stringify({
+            device_id: CONFIG.DEVICE_ID,
+            env_id: CONFIG.ENV_ID,
+            session_id: CONFIG.SESSION_ID,
+            timestamp: new Date().toISOString(),
+            readings: {
+              mic_db: rawNoise,
+              accel_x: 0.0,
+              accel_y: 0.0,
+              accel_z: rawDrift,
+              pressure_hpa: 1013.2,
+              wifi_rssi: rawWifi,
+              wifi_ap_count: 5,
+              ble_count: 2
+            }
+          }));
+        }
+      }
+    });
+    return;
+  }
+
   // 1. Simulate Raw Signals per Node
   Object.values(nodes).forEach(node => {
     // Noise floor: base + slow diurnal sine wave fluctuation + Gaussian noise
@@ -893,6 +969,209 @@ function bindEventHandlers() {
 
   // Export Button
   document.getElementById('btn-export-session').addEventListener('click', exportSessionJSON);
+
+  // Mode Toggle Button
+  const toggleBtn = document.getElementById('btn-mode-toggle');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      CONFIG.USE_REAL_BACKEND = !CONFIG.USE_REAL_BACKEND;
+      if (CONFIG.USE_REAL_BACKEND) {
+        connectLiveBackend();
+      } else {
+        disconnectLiveBackend();
+      }
+    });
+  }
+}
+
+// --- LIVE BACKEND WEBSOCKET HANDLERS ---
+let dashboardWs = null;
+let sensorWs = null;
+let reconnectTimer = null;
+
+function connectLiveBackend() {
+  if (!CONFIG.USE_REAL_BACKEND) return;
+  
+  if (dashboardWs) dashboardWs.close();
+  if (sensorWs) sensorWs.close();
+  
+  const liveBadge = document.getElementById('live-badge');
+  const toggleBtn = document.getElementById('btn-mode-toggle');
+  
+  toggleBtn.innerText = "LIVE MODE";
+  toggleBtn.style.borderColor = "var(--neon-green)";
+  toggleBtn.style.color = "var(--neon-green)";
+  toggleBtn.style.textShadow = "0 0 4px var(--neon-green-dim)";
+  
+  liveBadge.style.display = "inline-block";
+  liveBadge.innerText = "CONNECTING...";
+  liveBadge.style.borderColor = "var(--neon-amber)";
+  liveBadge.style.color = "var(--neon-amber)";
+  
+  dashboardWs = new WebSocket(`${CONFIG.BACKEND_WS}/${CONFIG.ENV_ID}`);
+  
+  dashboardWs.onopen = () => {
+    liveBadge.innerText = "LIVE";
+    liveBadge.style.borderColor = "var(--neon-green)";
+    liveBadge.style.color = "var(--neon-green)";
+    appendSystemLog("Connected to live backend dashboard feed.", "green");
+  };
+  
+  let prevAlertState = false;
+  
+  dashboardWs.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data.type === "backfill") {
+        const selectedNode = nodes[selectedNodeId];
+        selectedNode.riskHistory = data.scores;
+        drawRiskHistoryChart();
+      } else if (data.type === "drift_update") {
+        const selectedNode = nodes[selectedNodeId];
+        
+        const compScore = data.composite_score;
+        selectedNode.compositeHazard = compScore * 3.0;
+        selectedNode.rawWeighted = compScore * 3.0;
+        
+        selectedNode.sensors.noise.zScore = data.drift_per_signal.mic || 0.0;
+        selectedNode.sensors.wifi.zScore = data.drift_per_signal.wifi || 0.0;
+        selectedNode.sensors.drift.zScore = data.drift_per_signal.accel || 0.0;
+        
+        const isAlert = data.alert_triggered;
+        if (isAlert) {
+          selectedNode.status = 'HAZARD';
+          if (!prevAlertState) {
+            triggerRiskAlertFromLive(selectedNode, compScore, data.channels_above, data.lead_time_estimate_min);
+          }
+        } else if (compScore > 0.33) {
+          selectedNode.status = 'WARNING';
+        } else {
+          selectedNode.status = 'NOMINAL';
+        }
+        prevAlertState = isAlert;
+        
+        if (!selectedNode.riskHistory) selectedNode.riskHistory = [];
+        selectedNode.riskHistory.push(compScore);
+        if (selectedNode.riskHistory.length > 150) selectedNode.riskHistory.shift();
+        
+        const noiseSensor = selectedNode.sensors.noise;
+        noiseSensor.raw = noiseSensor.emaMean + (data.drift_per_signal.mic * noiseSensor.emaStd);
+        noiseSensor.history.push({ val: noiseSensor.raw, mean: noiseSensor.emaMean, std: noiseSensor.emaStd });
+        if (noiseSensor.history.length > CONFIG.maxHistorySize) noiseSensor.history.shift();
+        
+        const wifiSensor = selectedNode.sensors.wifi;
+        wifiSensor.raw = wifiSensor.emaMean + (data.drift_per_signal.wifi * wifiSensor.emaStd);
+        wifiSensor.history.push({ val: wifiSensor.raw, mean: wifiSensor.emaMean, std: wifiSensor.emaStd });
+        if (wifiSensor.history.length > CONFIG.maxHistorySize) wifiSensor.history.shift();
+        
+        const driftSensor = selectedNode.sensors.drift;
+        driftSensor.raw = driftSensor.emaMean + (data.drift_per_signal.accel * driftSensor.emaStd);
+        driftSensor.history.push({ val: driftSensor.raw, mean: driftSensor.emaMean, std: driftSensor.emaStd });
+        if (driftSensor.history.length > CONFIG.maxHistorySize) driftSensor.history.shift();
+        
+        updateUI();
+        drawCharts();
+        
+        const forecastEl = document.getElementById('trend-forecast');
+        if (forecastEl) {
+          if (data.lead_time_estimate_min !== null) {
+            forecastEl.innerText = `Estimated time to critical: ~${Math.round(data.lead_time_estimate_min)} min`;
+            forecastEl.className = "meta-val text-red";
+          } else {
+            forecastEl.innerText = "Stable";
+            forecastEl.className = "meta-val text-green";
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error processing live dashboard message:", err);
+    }
+  };
+  
+  dashboardWs.onclose = () => {
+    handleLiveDisconnect();
+  };
+  
+  dashboardWs.onerror = () => {
+    handleLiveDisconnect();
+  };
+  
+  sensorWs = new WebSocket(`${CONFIG.SENSOR_WS}/${CONFIG.ENV_ID}?device_id=${CONFIG.DEVICE_ID}`);
+  
+  sensorWs.onopen = () => {
+    appendSystemLog("Connected to live backend sensor ingestion stream.", "green");
+  };
+}
+
+function handleLiveDisconnect() {
+  if (!CONFIG.USE_REAL_BACKEND) return;
+  
+  const liveBadge = document.getElementById('live-badge');
+  if (liveBadge.innerText === "RECONNECTING...") return;
+  
+  liveBadge.innerText = "RECONNECTING...";
+  liveBadge.style.borderColor = "var(--neon-amber)";
+  liveBadge.style.color = "var(--neon-amber)";
+  
+  appendSystemLog("Live connection lost. Reconnecting in 3s...", "amber");
+  
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(() => {
+    connectLiveBackend();
+  }, 3000);
+}
+
+function disconnectLiveBackend() {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  
+  if (dashboardWs) {
+    dashboardWs.close();
+    dashboardWs = null;
+  }
+  if (sensorWs) {
+    sensorWs.close();
+    sensorWs = null;
+  }
+  
+  const liveBadge = document.getElementById('live-badge');
+  liveBadge.style.display = "none";
+  
+  const toggleBtn = document.getElementById('btn-mode-toggle');
+  toggleBtn.innerText = "SIMULATION MODE";
+  toggleBtn.style.borderColor = "var(--neon-cyan)";
+  toggleBtn.style.color = "var(--neon-cyan)";
+  toggleBtn.style.textShadow = "0 0 4px var(--neon-cyan-dim)";
+  
+  appendSystemLog("Switched back to local Simulation Mode.", "cyan");
+  resetBaselines();
+}
+
+function triggerRiskAlertFromLive(node, risk, channels, leadTimeMin) {
+  const now = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+  const leadTimeStr = leadTimeMin !== null ? `~${Math.round(leadTimeMin)} min` : 'Stable';
+  
+  const logContainer = document.getElementById('risk-event-logs');
+  if (logContainer) {
+    if (riskAlertEvents.length === 0) {
+      logContainer.innerHTML = '';
+    }
+    
+    riskAlertEvents.push({
+      timestamp: timeStr,
+      node_id: node.id,
+      node_name: node.name,
+      score: risk.toFixed(2),
+      channels: channels,
+      lead_time_est: leadTimeStr
+    });
+    
+    const line = document.createElement('div');
+    line.className = 'log-line text-red';
+    line.innerHTML = `<span class="text-dim">[${timeStr}]</span> ⚠ ALERT — score: ${risk.toFixed(2)} | channels: ${channels.join(', ')} | lead_time_est: ${leadTimeStr}`;
+    logContainer.appendChild(line);
+    logContainer.scrollTop = logContainer.scrollHeight;
+  }
 }
 
 // --- NEW RISK ENGINE FUNCTIONS ---
@@ -1152,6 +1431,34 @@ function drawRiskHistoryChart() {
 }
 
 function exportSessionJSON() {
+  if (CONFIG.USE_REAL_BACKEND) {
+    appendSystemLog("Requesting telemetry session export from backend...", "cyan");
+    fetch(`${CONFIG.API_BASE}/alerts/export/${CONFIG.ENV_ID}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Backend export request failed");
+        return res.json();
+      })
+      .then(data => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `phantom_live_session_${Date.now()}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        appendSystemLog("Live session telemetry dataset exported from backend successfully.", "green");
+      })
+      .catch(err => {
+        console.error(err);
+        appendSystemLog("Failed to export live session from backend. Falling back to local data.", "red");
+        exportLocalSessionJSON();
+      });
+  } else {
+    exportLocalSessionJSON();
+  }
+}
+
+function exportLocalSessionJSON() {
   const selectedNode = nodes[selectedNodeId];
   
   const exportData = {
